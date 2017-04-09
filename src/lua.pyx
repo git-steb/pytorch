@@ -4,11 +4,16 @@ import threading
 # GENERATED FILE, do not edit by hand
 # Source: src/lua.jinja2.pyx
 
-#import PyTorch
-#cimport PyTorch
+__interface_build__ = False
+
+if __interface_build__:
+    import PyTorch
+    cimport PyTorch
+
 from nnWrapper cimport *
 
-# from PyTorch cimport *
+if __interface_build__:
+    from PyTorch cimport *
 
 LUA_REGISTRYINDEX = getLuaRegistryIndex()
 
@@ -64,6 +69,9 @@ cdef class LuaState(object):
 
     def toNumber(self, int index):
         return lua_tonumber(self.L, index)
+
+    def toBoolean(self, int index):
+        return bool(lua_toboolean(self.L, index))
 
     def getGlobal(self, name):
         lua_getglobal(self.L, name.encode('utf-8'))
