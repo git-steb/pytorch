@@ -65,6 +65,9 @@ cdef class LuaState(object):
     def toNumber(self, int index):
         return lua_tonumber(self.L, index)
 
+    def toBoolean(self, int index):
+        return bool(lua_toboolean(self.L, index))
+
     def getGlobal(self, name):
         lua_getglobal(self.L, name.encode('utf-8'))
 

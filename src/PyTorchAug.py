@@ -174,6 +174,11 @@ def popSomething(lua, self=None, name=None):
         lua.remove(-1)
         return mymethod
 
+    if typestring == 'boolean':
+        res = lua.toBoolean(-1)
+        lua.remove(-1)
+        return bool(res)
+
     if typestring == 'nil':
         lua.remove(-1)
         return None
@@ -307,40 +312,42 @@ class LuaClass(object):
         assert topStart == topEnd
         return res
 
-
-def loadNnClass(nnClassName):
-    class AnNnClass(LuaClass):
-        def __init__(self, *args, **kwargs):
+def loadModuleClass(module,lua_classname,load_module=True):
+    if load_module:
+        PyTorch.require(module)
+    class LuaWrapper(LuaClass):
+        def __init__(self, *args):
             _fromLua = False
             if len(args) >= 1:
                 if args[0] == '__FROMLUA__':
-                    _fromLua = True
-                    args = args[1:]
-#            print('annnclass.__init__', nnClassName, 'fromLua', _fromLua, 'args', args)
-            self.luaclass = 'nn.' + nnClassName
+                   _fromLua = True
+                   args = args[1:]
+#            print('LuaWrapper.__init__', lua_classname, 'fromLua', _fromLua, 'args', args)
+            self.luaclass = module+'.'+lua_classname
             if not _fromLua:
-                LuaClass.__init__(self, ['nn', nnClassName], *args, **kwargs)
+                LuaClass.__init__(self, [module,lua_classname], *args)
             else:
                 self.__dict__['__objectId'] = getNextObjectId()
-    renamedClass = type(AnNnClass)(nnClassName, (AnNnClass,), {})
+    renamedClass = PyTorchLua.renameClass(LuaWrapper, module, lua_classname)
     return renamedClass
 
 
-def setupNnClass(nnClassName):
-    nnClass = loadNnClass(nnClassName)
-    globals()[nnClassName] = nnClass
-    luaClasses['nn.' + nnClassName] = nnClass
-    luaClassesReverse[nnClass] = 'nn.' + nnClassName
-    return nnClass
+def setupModuleClass(moduleName,moduleClassName):
+    moduleClass = loadModuleClass(moduleName,moduleClassName,False)
+    globals()[moduleClassName] = moduleClass
+    luaClasses[moduleName + '.' + moduleClassName] = moduleClass
+    luaClassesReverse[moduleClass] = moduleName + '.' + moduleClassName
+    return moduleClass
 
-
-class Nn(object):
-    def __init__(self):
+class Module(object):
+    def __init__(self,moduleName):
+        PyTorch.require(moduleName)
         self.classes = {}
+        self.moduleName = moduleName
 
     def __getattr__(self, name):
         if name not in self.classes:
-            self.classes[name] = setupNnClass(name)
+            self.classes[name] = setupModuleClass(self.moduleName,name)
         thisClass = self.classes[name]
         return thisClass
 
@@ -352,7 +359,7 @@ def populateLuaClassesReverse():
         luaClassesReverse[classtype] = name
 
 lua = PyTorch.getGlobalState().getLua()
-nn = Nn()
+nn = Module('nn')
 
 cythonClasses = {}
 cythonClasses['torch.FloatTensor'] = {'popFunction': PyTorch._popFloatTensor}

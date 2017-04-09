@@ -187,6 +187,17 @@ cd pytorch
 ./run_tests.sh
 ```
 
+# Rebuild Lua interface
+
+Some of the source files in the `src` folder are auto-generated. To regenerate, e.g. in case the lua interface in `src/lua.jinja2.*` has been updated, run the following:
+
+```
+export TORCH_INSTALL=$(realpath $(dirname $(which th))/..)
+./clean.sh
+JINJA2_ONLY=1 python setup.py
+CYTHON=1 python setup.py
+```
+
 # Python 2 vs Python 3?
 
 - pytorch is developed and maintained on python 3

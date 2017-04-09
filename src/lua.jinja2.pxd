@@ -23,6 +23,7 @@ cdef extern from "lua_externc.h":
     struct lua_State
     void lua_pushnumber(lua_State *L, float number)
     float lua_tonumber(lua_State *L, int index)
+    int lua_toboolean(lua_State *L, int index)
     void lua_pushstring(lua_State *L, const char *value)
     const char *lua_tostring(lua_State *L, int index)
     void lua_call(lua_State *L, int argsIn, int argsOut) nogil

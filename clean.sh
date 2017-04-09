@@ -8,3 +8,4 @@ rm -Rf build PyBuild.so dist *.egg-info cbuild src/*.so src/PyTorch.egg-info ${T
 pip uninstall -y PyTorch
 rm src/Storage.cpp src/Storage.pxd src/Storage.pyx src/PyTorch.pxd src/PyTorch.pyx src/PyTorch.cpp
 rm src/nnWrapper.cpp src/nnWrapper.h src/lua.pxd src/lua.pyx
+rm src/lua.cpp
