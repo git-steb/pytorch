@@ -792,7 +792,6 @@ def getGlobal(name):
     global globalState
     cdef lua_State *L
     L = globalState.L
-        
 
 def init():
     global globalState

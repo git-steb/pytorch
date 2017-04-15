@@ -3,12 +3,11 @@ from collections import OrderedDict
 import threading
 import PyTorch
 import PyTorchLua
-import PyTorchHelpers
+from PyTorchHelpers import *
 
 nextObjectId = 1
 luaClasses = {}
 luaClassesReverse = {}
-
 
 # this is so we can ctrl-c lua functions.  we have to run them in a separate thread
 # for this, so that the python event log can continue ('event loop' might not be quite
@@ -179,12 +178,17 @@ def popSomething(lua, self=None, name=None):
         lua.remove(-1)
         return bool(res)
 
+    if typestring == 'userdata':
+        pushGlobal(lua,'swig_wrap')
+        lua.insert(-2)
+        lua.call(1, 1)
+        return popSomething(lua, self, name)
+
     if typestring == 'nil':
         lua.remove(-1)
         return None
 
     raise Exception('pop type ' + str(typestring) + ' not implemented')
-    # print('pop type ' + str(typestring) + ' not implemented')
 
 
 def pushTable(lua, table):
@@ -243,17 +247,16 @@ def load(filepath):
 
     return res
 
-
 class LuaClass(object):
     def __init__(self, nameList, *args):
         lua = PyTorch.getGlobalState().getLua()
         self.__dict__['__objectId'] = getNextObjectId()
         topStart = lua.getTop()
+        #print('nameList', nameList)
+        #print('args', args)
         pushGlobalFromList(lua, nameList)
         for arg in args:
             pushSomething(lua, arg)
-#        print('nameList', nameList)
-#        print('args', args)
         res = lua.pcall(len(args), 1)
         if res != 0:
             errorMessage = popString(lua)
@@ -312,7 +315,7 @@ class LuaClass(object):
         assert topStart == topEnd
         return res
 
-def loadModuleClass(module,lua_classname,load_module=True):
+def loadModuleClass(module,lua_classname,load_module=True,makeLookupKey = lambda m,c: m+'.'+c):
     if load_module:
         PyTorch.require(module)
     class LuaWrapper(LuaClass):
@@ -322,35 +325,51 @@ def loadModuleClass(module,lua_classname,load_module=True):
                 if args[0] == '__FROMLUA__':
                    _fromLua = True
                    args = args[1:]
-#            print('LuaWrapper.__init__', lua_classname, 'fromLua', _fromLua, 'args', args)
-            self.luaclass = module+'.'+lua_classname
+            #print('LuaWrapper.__init__', lua_classname, 'fromLua', _fromLua, 'args', args)
+            #print([module,lua_classname])
+            self.luaclass = makeLookupKey(module,lua_classname)
             if not _fromLua:
-                LuaClass.__init__(self, [module,lua_classname], *args)
+                splitNames = self.luaclass.split('.')
+                LuaClass.__init__(self, splitNames, *args)                
             else:
                 self.__dict__['__objectId'] = getNextObjectId()
     renamedClass = PyTorchLua.renameClass(LuaWrapper, module, lua_classname)
     return renamedClass
 
-
-def setupModuleClass(moduleName,moduleClassName):
-    moduleClass = loadModuleClass(moduleName,moduleClassName,False)
+def setupModuleClass(moduleName,
+                     moduleClassName,
+                     makeLookupKey = lambda m,c: m+'.'+c):
+    moduleClass = loadModuleClass(moduleName,moduleClassName,False,makeLookupKey)
     globals()[moduleClassName] = moduleClass
-    luaClasses[moduleName + '.' + moduleClassName] = moduleClass
-    luaClassesReverse[moduleClass] = moduleName + '.' + moduleClassName
+    lookupKey = makeLookupKey(moduleName, moduleClassName)
+    moduleClass.luaclass = lookupKey
+    luaClasses[lookupKey] = moduleClass
+    luaClassesReverse[moduleClass] = lookupKey
     return moduleClass
 
+def setupGlobalModuleClass(moduleName,
+                           moduleClassName):
+    return setupModuleClass(moduleName,
+                            moduleClassName,
+                            lambda m,c: c)
+
 class Module(object):
-    def __init__(self,moduleName):
-        PyTorch.require(moduleName)
+    def __init__(self,moduleName,load_module=True):
+        if load_module:
+            PyTorch.require(moduleName)
         self.classes = {}
         self.moduleName = moduleName
 
+    setupModuleClass = staticmethod(setupModuleClass)
+
     def __getattr__(self, name):
         if name not in self.classes:
-            self.classes[name] = setupModuleClass(self.moduleName,name)
+            self.classes[name] = self.setupModuleClass(self.moduleName,name)
         thisClass = self.classes[name]
         return thisClass
 
+class ModuleGlobal(Module):
+    setupModuleClass = staticmethod(setupGlobalModuleClass)
 
 def populateLuaClassesReverse():
     luaClassesReverse.clear()
@@ -359,6 +378,39 @@ def populateLuaClassesReverse():
         luaClassesReverse[classtype] = name
 
 lua = PyTorch.getGlobalState().getLua()
+ret = lua.loadBufferAndCall("""
+local SwigWrap = torch.class('SwigWrap')
+function swig_wrap(rv)
+   if torch.type(rv) == 'userdata' then
+      return SwigWrap.new(rv)
+   else
+      return rv
+   end
+end
+function SwigWrap:__init(ud)
+   self.__userdata__ = ud
+   self:registerSwigMetatable(getmetatable(ud))
+end
+function SwigWrap:registerSwigMetatable(mt)
+   for k,v in pairs(mt['.bases']) do
+      self:registerSwigMetatable(v)
+   end
+   for k,v in pairs(mt['.fn']) do
+      self[k] = function(b,...) return swig(v(b.__userdata__,...)) end
+   end
+   for k,v in pairs(mt['.get']) do
+      self['get_'+tostring(k)] = function(b) return swig(v(b.__userdata__)) end
+   end
+   for k,v in pairs(mt['.set']) do
+      self['set_'+tostring(k)] = function(b,...) return swig(v(b.__userdata__,...)) end
+   end
+end
+""","swigwrap")
+assert(ret == 0)
+
+swigwrap = ModuleGlobal('swigwrap',False)
+swigwrap.SwigWrap
+
 nn = Module('nn')
 
 cythonClasses = {}

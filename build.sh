@@ -7,7 +7,7 @@
 # - torch is expected to be already activated, ie run:
 #    source ~/torch/install/bin/torch_activate.sh
 #    ... or similar
-# - torch is expected to be at $HOME/torch
+# - torch is expected to be installed two folders up from the luajit binary
 
 export TORCH_INSTALL=$(dirname $(dirname $(which luajit) 2>/dev/null) 2>/dev/null)
 

@@ -21,6 +21,9 @@ cdef extern from "LuaHelper.h":
 
 cdef extern from "lua_externc.h":
     struct lua_State
+    cdef int LUA_ERRSYNTAX
+    cdef int LUA_ERRMEM
+    cdef int LUA_MULTRET
     void lua_pushnumber(lua_State *L, float number)
     float lua_tonumber(lua_State *L, int index)
     int lua_toboolean(lua_State *L, int index)
@@ -43,6 +46,10 @@ cdef extern from "lua_externc.h":
     int lua_next(lua_State *L, int index)
     int lua_gettop(lua_State *L)
     int lua_isuserdata(lua_State *L, int index)
+    int luaL_loadbuffer(lua_State *L,
+                        const char *buff,
+                        size_t sz,
+                        const char *name)
 
 cdef class LuaState(object):
     cdef lua_State *L

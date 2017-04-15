@@ -121,6 +121,12 @@ cdef class LuaState(object):
     def isUserData(self, int index):
         return lua_isuserdata(self.L, index)
 
+    def loadBufferAndCall(self, code, chunkname=None):
+        ret = luaL_loadbuffer(self.L, code, len(code), chunkname)
+        if ret == 0:
+            return lua_pcall(self.L, 0, LUA_MULTRET, 0)
+        return ret
+
 cdef LuaState_fromNative(lua_State *L):
     cdef LuaState luaState = LuaState(_allocate=False)
     luaState.L = L

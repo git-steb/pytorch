@@ -23,3 +23,14 @@ def load_lua_class(lua_filename, lua_classname):
     renamedClass = PyTorchLua.renameClass(LuaWrapper, module, lua_classname)
     return renamedClass
 
+def load_lua_buffer(chunkbuffer,chunkname):
+    "Compile and run the Lua code in chunkbuffer and put objects in module chunkname"
+    lua = PyTorch.getGlobalState().getLua()
+    return lua.loadBufferAndCall(chunkbuffer,chunkname)
+
+from inspect import currentframe, getframeinfo
+
+def get_linenumber():
+    "Line number in Python script that calls this function."
+    cf = currentframe()
+    return cf.f_back.f_lineno

@@ -86,6 +86,8 @@ libraries = []
 extra_link_args = []
 # libraries.append('lua5.1')
 # libraries.append('luaT')
+# libraries.append('qlua')
+libraries.append('luajit')
 # libraries.append('mylib')
 libraries.append('PyTorchNative')
 # libraries.append('TH')
